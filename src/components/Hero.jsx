@@ -14,33 +14,97 @@ export default function Hero() {
   const [exitoso, setExitoso] = useState(false)
   const [mostrarTerminos, setMostrarTerminos] = useState(false)
   const [flotas, setFlotas] = useState([])
-  const [cargandoFlotas, setCargandoFlotas] = useState(true)
+  const [cargandoFlotas, setCargandoFlotas] = useState(false)
+  
+  // Estados para validación de licencia
+  const [licenciaValidada, setLicenciaValidada] = useState(false)
+  const [datosDriver, setDatosDriver] = useState(null)
+  const [validandoLicencia, setValidandoLicencia] = useState(false)
+  const [mensajeValidacion, setMensajeValidacion] = useState('')
 
-  useEffect(() => {
-    cargarFlotas()
-  }, [])
+  // Ya no cargamos flotas automáticamente
 
-  const cargarFlotas = async () => {
+  const cargarFlotasConductor = async (licenseNumber) => {
     try {
       setCargandoFlotas(true)
-      const response = await fetch(API_ENDPOINTS.FLOTAS, {
-        method: 'POST',
+      const response = await fetch(API_ENDPOINTS.FLOTAS_CONDUCTOR(licenseNumber), {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       })
       
       if (!response.ok) {
-        throw new Error('Error al cargar flotas')
+        throw new Error('Error al cargar flotas del conductor')
       }
       
       const data = await response.json()
-      setFlotas(data || [])
+      
+      // Convertir las flotas del conductor al formato esperado
+      const flotasConductor = data.flotasDisponibles.map(flota => ({
+        id: flota.parkId,
+        name: flota.parkName,
+        city: flota.city,
+        activo: flota.activo
+      }))
+      
+      setFlotas(flotasConductor)
     } catch (error) {
-      console.error('Error al cargar flotas:', error)
+      console.error('Error al cargar flotas del conductor:', error)
       setFlotas([])
     } finally {
       setCargandoFlotas(false)
+    }
+  }
+
+  const validarLicencia = async () => {
+    if (!formData.licenciaNumero.trim()) {
+      setErrores(prev => ({ ...prev, licenciaNumero: 'Ingresa un número de licencia' }))
+      return
+    }
+
+    setValidandoLicencia(true)
+    setMensajeValidacion('')
+    setLicenciaValidada(false)
+    setDatosDriver(null)
+    setFlotas([]) // Limpiar flotas anteriores
+
+    try {
+      // Paso 1: Validar licencia
+      const response = await fetch(API_ENDPOINTS.VALIDAR_LICENCIA(formData.licenciaNumero), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        if (data.existe) {
+          setLicenciaValidada(true)
+          setDatosDriver(data.driver)
+          setMensajeValidacion(data.mensaje)
+          setErrores(prev => ({ ...prev, licenciaNumero: '' }))
+          
+          // Paso 2: Cargar flotas específicas del conductor
+          await cargarFlotasConductor(formData.licenciaNumero)
+        } else {
+          setLicenciaValidada(false)
+          setDatosDriver(null)
+          setMensajeValidacion(data.mensaje)
+          setErrores(prev => ({ ...prev, licenciaNumero: data.mensaje }))
+        }
+      } else {
+        throw new Error('Error al validar licencia')
+      }
+    } catch (error) {
+      console.error('Error al validar licencia:', error)
+      setErrores(prev => ({ ...prev, licenciaNumero: 'Error al conectar con el servidor' }))
+      setLicenciaValidada(false)
+      setDatosDriver(null)
+    } finally {
+      setValidandoLicencia(false)
     }
   }
 
@@ -50,6 +114,16 @@ export default function Hero() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+    
+    // Si cambia la licencia, resetear la validación y flotas
+    if (name === 'licenciaNumero') {
+      setLicenciaValidada(false)
+      setDatosDriver(null)
+      setMensajeValidacion('')
+      setFlotas([])
+      setFormData(prev => ({ ...prev, flota: '' })) // Resetear selección de flota
+    }
+    
     if (errores[name]) {
       setErrores(prev => ({ ...prev, [name]: '' }))
     }
@@ -60,6 +134,8 @@ export default function Hero() {
 
     if (!formData.licenciaNumero.trim()) {
       nuevosErrores.licenciaNumero = 'El número de licencia es requerido'
+    } else if (!licenciaValidada) {
+      nuevosErrores.licenciaNumero = 'Debes validar la licencia primero'
     }
 
     if (!formData.flota) {
@@ -108,6 +184,12 @@ export default function Hero() {
           flota: '',
           terminosAceptados: false
         })
+        
+        // Resetear validación de licencia y flotas
+        setLicenciaValidada(false)
+        setDatosDriver(null)
+        setMensajeValidacion('')
+        setFlotas([])
         
         setTimeout(() => {
           setExitoso(false)
@@ -242,57 +324,88 @@ export default function Hero() {
                   <label className="block text-sm font-bold text-dark mb-2">
                     Número de Licencia *
                   </label>
-                  <input
-                    type="text"
-                    name="licenciaNumero"
-                    value={formData.licenciaNumero}
-                    onChange={manejarCambio}
-                    className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
-                      errores.licenciaNumero ? 'border-red-500' : 'border-dark'
-                    }`}
-                    placeholder="Ej: Q12345678"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="licenciaNumero"
+                      value={formData.licenciaNumero}
+                      onChange={manejarCambio}
+                      disabled={licenciaValidada}
+                      className={`flex-1 px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
+                        errores.licenciaNumero ? 'border-red-500' : licenciaValidada ? 'border-green-500 bg-green-50' : 'border-dark'
+                      } ${licenciaValidada ? 'opacity-75' : ''}`}
+                      placeholder="Ej: ABC123"
+                    />
+                    <button
+                      type="button"
+                      onClick={validarLicencia}
+                      disabled={validandoLicencia || licenciaValidada || !formData.licenciaNumero.trim()}
+                      className={`px-6 py-3 font-bold text-sm rounded-xl transition-all duration-300 border-2 ${
+                        licenciaValidada 
+                          ? 'bg-green-500 text-white border-green-500' 
+                          : 'bg-primary text-white border-primary hover:bg-primary-dark hover:-translate-y-0.5'
+                      } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+                    >
+                      {validandoLicencia ? (
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : licenciaValidada ? (
+                        '✓'
+                      ) : (
+                        'Validar'
+                      )}
+                    </button>
+                  </div>
                   {errores.licenciaNumero && (
                     <p className="mt-2 text-sm text-red-500 font-medium">
                       {errores.licenciaNumero}
                     </p>
                   )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-dark mb-2">
-                    Seleccionar Flota *
-                  </label>
-                  <select
-                    name="flota"
-                    value={formData.flota}
-                    onChange={manejarCambio}
-                    disabled={cargandoFlotas}
-                    className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer bg-white ${
-                      errores.flota ? 'border-red-500' : 'border-dark'
-                    } ${cargandoFlotas ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    style={{ 
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231A1A1A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 1rem center',
-                      backgroundSize: '1.5rem'
-                    }}
-                  >
-                    <option value="">
-                      {cargandoFlotas ? 'Cargando flotas...' : 'Seleccionar flota'}
-                    </option>
-                    {flotas.map((flota) => (
-                      <option key={flota.id} value={flota.id}>
-                        {flota.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errores.flota && (
-                    <p className="mt-2 text-sm text-red-500 font-medium">
-                      {errores.flota}
-                    </p>
+                  {licenciaValidada && mensajeValidacion && (
+                    <div className="mt-1 pl-2  rounded-xl">
+                      <p className="font-bold text-green-700">{mensajeValidacion}</p>
+                    </div>
                   )}
                 </div>
+
+                {licenciaValidada && (
+                  <div>
+                    <label className="block text-sm font-bold text-dark mb-2">
+                      Seleccionar Flota *
+                    </label>
+                    <select
+                      name="flota"
+                      value={formData.flota}
+                      onChange={manejarCambio}
+                      disabled={cargandoFlotas}
+                      className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer bg-white ${
+                        errores.flota ? 'border-red-500' : 'border-dark'
+                      } ${cargandoFlotas ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      style={{ 
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231A1A1A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 1rem center',
+                        backgroundSize: '1.5rem'
+                      }}
+                    >
+                      <option value="">
+                        {cargandoFlotas ? 'Cargando tus flotas...' : 'Selecciona tu flota'}
+                      </option>
+                      {flotas.map((flota) => (
+                        <option key={flota.id} value={flota.id}>
+                          {flota.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errores.flota && (
+                      <p className="mt-2 text-sm text-red-500 font-medium">
+                        {errores.flota}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="pt-4">
                   <label className="flex items-start gap-3 cursor-pointer group">
@@ -326,7 +439,7 @@ export default function Hero() {
 
                 <button
                   type="submit"
-                  disabled={enviando}
+                  disabled={enviando || !licenciaValidada || !formData.flota || !formData.terminosAceptados}
                   className="w-full py-4 bg-primary text-white font-bold text-lg rounded-xl transition-all duration-300 hover:bg-primary-dark hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-primary"
                 >
                   {enviando ? (
