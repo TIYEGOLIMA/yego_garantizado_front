@@ -1,0 +1,364 @@
+import { useState, useEffect } from 'react'
+import ModalTerminos from './ModalTerminos'
+import { API_ENDPOINTS } from '../config/api'
+
+export default function Hero() {
+  const [formData, setFormData] = useState({
+    licenciaNumero: '',
+    flota: '',
+    terminosAceptados: false
+  })
+
+  const [errores, setErrores] = useState({})
+  const [enviando, setEnviando] = useState(false)
+  const [exitoso, setExitoso] = useState(false)
+  const [mostrarTerminos, setMostrarTerminos] = useState(false)
+  const [flotas, setFlotas] = useState([])
+  const [cargandoFlotas, setCargandoFlotas] = useState(true)
+
+  useEffect(() => {
+    cargarFlotas()
+  }, [])
+
+  const cargarFlotas = async () => {
+    try {
+      setCargandoFlotas(true)
+      const response = await fetch(API_ENDPOINTS.FLOTAS, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar flotas')
+      }
+      
+      const data = await response.json()
+      setFlotas(data || [])
+    } catch (error) {
+      console.error('Error al cargar flotas:', error)
+      setFlotas([])
+    } finally {
+      setCargandoFlotas(false)
+    }
+  }
+
+  const manejarCambio = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+    if (errores[name]) {
+      setErrores(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  const validarFormulario = () => {
+    const nuevosErrores = {}
+
+    if (!formData.licenciaNumero.trim()) {
+      nuevosErrores.licenciaNumero = 'El número de licencia es requerido'
+    }
+
+    if (!formData.flota) {
+      nuevosErrores.flota = 'Selecciona un tipo de flota'
+    }
+
+    if (!formData.terminosAceptados) {
+      nuevosErrores.terminosAceptados = 'Debes aceptar los términos y condiciones'
+    }
+
+    return nuevosErrores
+  }
+
+  const manejarEnvio = async (e) => {
+    e.preventDefault()
+    
+    const nuevosErrores = validarFormulario()
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores)
+      return
+    }
+
+    setEnviando(true)
+    
+    const datosParaEnviar = {
+      yegLicenciaNumero: formData.licenciaNumero,
+      yegFlota: formData.flota,
+      yegTerminosAceptados: formData.terminosAceptados
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.REGISTROS, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(datosParaEnviar)
+      })
+
+      const resultado = await response.json()
+
+      if (response.ok) {
+        setExitoso(true)
+        setFormData({
+          licenciaNumero: '',
+          flota: '',
+          terminosAceptados: false
+        })
+        
+        setTimeout(() => {
+          setExitoso(false)
+        }, 3000)
+      } else {
+        alert(resultado.mensaje || 'Error al registrar')
+      }
+    } catch (error) {
+      console.error('Error al enviar registro:', error)
+      alert('Error al conectar con el servidor. Por favor, intenta nuevamente.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="relative min-h-screen flex flex-col overflow-hidden bg-white">
+      <div className="absolute inset-0 overflow-hidden opacity-5">
+        <div className="absolute w-96 h-96 bg-primary rounded-full top-0 right-0 blur-3xl animate-float"></div>
+        <div className="absolute w-80 h-80 bg-primary rounded-full bottom-0 left-0 blur-3xl animate-float" style={{ animationDelay: '-7s' }}></div>
+      </div>
+      
+      <div className="relative z-10 py-6 px-4">
+        <div className="max-w-7xl mx-auto">
+          <img src="/yego.png" alt="YEGO" className="h-8 md:h-10" />
+        </div>
+      </div>
+      
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-4">
+        <div className="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
+        <div className="text-dark space-y-8 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-5 py-2 bg-white border-2 border-dark rounded-full text-sm font-bold">
+            <div className="w-2 h-2 bg-primary rounded-full"></div>
+            <span className="text-dark">ÚNETE AL EQUIPO</span>
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-black leading-tight text-dark">
+            Conduce y Gana tu{' '}
+            <span className="text-primary">Bono</span>
+            <br />
+            Garantizado
+          </h1>
+          
+          <p className="text-xl text-gray-600 leading-relaxed">
+            Genera ingresos flexibles manejando tu propio horario. 
+            Sistema de garantizado atractivo y pagos puntuales.
+          </p>
+          
+          <div className="flex flex-wrap gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-dark">Garantizado</p>
+                <p className="text-sm text-gray-500">Ingresos seguros</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-dark">Pagos rápidos</p>
+                <p className="text-sm text-gray-500">Sin demoras</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-dark">App fácil</p>
+                <p className="text-sm text-gray-500">Interfaz simple</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Gratis
+            </span>
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Sin compromiso
+            </span>
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Inicio inmediato
+            </span>
+          </div>
+        </div>
+        
+        <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          {exitoso ? (
+            <div className="bg-white rounded-2xl shadow-2xl p-8 text-center border-2 border-primary">
+              <div className="mb-6">
+                <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-3xl font-bold text-dark mb-3">
+                  ¡Registro <span className="text-primary">Aprobado!</span>
+                </h2>
+                <p className="text-gray-600">
+                  Nos pondremos en contacto contigo pronto.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-2xl p-8">
+              <h2 className="text-3xl font-bold text-dark mb-6 text-center">
+                <span className="text-primary">Regístrate</span> Ahora
+              </h2>
+
+              <form onSubmit={manejarEnvio} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-dark mb-2">
+                    Número de Licencia *
+                  </label>
+                  <input
+                    type="text"
+                    name="licenciaNumero"
+                    value={formData.licenciaNumero}
+                    onChange={manejarCambio}
+                    className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
+                      errores.licenciaNumero ? 'border-red-500' : 'border-dark'
+                    }`}
+                    placeholder="Ej: Q12345678"
+                  />
+                  {errores.licenciaNumero && (
+                    <p className="mt-2 text-sm text-red-500 font-medium">
+                      {errores.licenciaNumero}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-dark mb-2">
+                    Seleccionar Flota *
+                  </label>
+                  <select
+                    name="flota"
+                    value={formData.flota}
+                    onChange={manejarCambio}
+                    disabled={cargandoFlotas}
+                    className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer bg-white ${
+                      errores.flota ? 'border-red-500' : 'border-dark'
+                    } ${cargandoFlotas ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    style={{ 
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231A1A1A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 1rem center',
+                      backgroundSize: '1.5rem'
+                    }}
+                  >
+                    <option value="">
+                      {cargandoFlotas ? 'Cargando flotas...' : 'Seleccionar flota'}
+                    </option>
+                    {flotas.map((flota) => (
+                      <option key={flota.id} value={flota.id}>
+                        {flota.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errores.flota && (
+                    <p className="mt-2 text-sm text-red-500 font-medium">
+                      {errores.flota}
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-4">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <div className="relative flex-shrink-0 mt-0.5">
+                      <input
+                        type="checkbox"
+                        name="terminosAceptados"
+                        checked={formData.terminosAceptados}
+                        onChange={manejarCambio}
+                        className="w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer accent-primary"
+                        style={{ accentColor: '#FF0000' }}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 leading-relaxed">
+                      Acepto los{' '}
+                      <button 
+                        type="button"
+                        onClick={() => setMostrarTerminos(true)}
+                        className="text-primary font-bold hover:underline"
+                      >
+                        términos y condiciones
+                      </button>
+                    </span>
+                  </label>
+                  {errores.terminosAceptados && (
+                    <p className="mt-2 text-sm text-red-500 font-medium ml-8">
+                      {errores.terminosAceptados}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={enviando}
+                  className="w-full py-4 bg-primary text-white font-bold text-lg rounded-xl transition-all duration-300 hover:bg-primary-dark hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-primary"
+                >
+                  {enviando ? (
+                    <span className="flex items-center justify-center gap-3">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Procesando...
+                    </span>
+                  ) : (
+                    'Enviar Registro'
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+      
+      <ModalTerminos 
+        mostrar={mostrarTerminos} 
+        onCerrar={() => setMostrarTerminos(false)}
+        onAceptar={() => {
+          setFormData(prev => ({ ...prev, terminosAceptados: true }))
+          setMostrarTerminos(false)
+          if (errores.terminosAceptados) {
+            setErrores(prev => ({ ...prev, terminosAceptados: '' }))
+          }
+        }}
+      />
+    </div>
+  )
+}
