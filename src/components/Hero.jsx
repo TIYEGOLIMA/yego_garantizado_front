@@ -21,8 +21,193 @@ export default function Hero() {
   const [datosDriver, setDatosDriver] = useState(null)
   const [validandoLicencia, setValidandoLicencia] = useState(false)
   const [mensajeValidacion, setMensajeValidacion] = useState('')
+  
+  // Estados para modal de redirección
+  const [mostrarModalRedireccion, setMostrarModalRedireccion] = useState(false)
+  const [contadorRedireccion, setContadorRedireccion] = useState(5)
+  
+  // Estados para sistema inactivo
+  const [sistemaActivo, setSistemaActivo] = useState(true)
+  const [mostrarModalSistemaInactivo, setMostrarModalSistemaInactivo] = useState(false)
+  const [ws, setWs] = useState(null)
+  const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
   // Ya no cargamos flotas automáticamente
+
+  // Verificar estado inicial del sistema al cargar
+  useEffect(() => {
+    verificarEstadoSistema()
+  }, [])
+
+  // WebSocket para sistema inactivo (opcional)
+  useEffect(() => {
+    let websocket = null
+    let reconectarTimeout = null
+
+    const conectarWebSocket = () => {
+      try {
+        websocket = new WebSocket('ws://localhost:8081/api/ws/sistema-externo')
+        
+        websocket.onopen = () => {
+          console.log('✅ Conectado al sistema de notificaciones WebSocket')
+          setReconnectAttempts(0)
+        }
+
+        websocket.onmessage = (event) => {
+          const message = JSON.parse(event.data)
+          console.log('📨 Mensaje WebSocket recibido:', message)
+          
+          switch (message.type) {
+            case 'STATUS_UPDATE':
+              const activo = message.message.includes('ACTIVO')
+              setSistemaActivo(activo)
+              if (!activo) {
+                setMostrarModalSistemaInactivo(true)
+              }
+              break
+            case 'SYSTEM_DEACTIVATED':
+              console.log('🚨 Sistema desactivado via WebSocket:', message.message)
+              setSistemaActivo(false)
+              setMostrarModalSistemaInactivo(true)
+              break
+            case 'STATUS_RESPONSE':
+              const sistemaActivo = message.message.includes('ACTIVO')
+              setSistemaActivo(sistemaActivo)
+              if (!sistemaActivo) {
+                setMostrarModalSistemaInactivo(true)
+              }
+              break
+          }
+        }
+
+        websocket.onclose = (event) => {
+          console.log('🔌 Conexión WebSocket cerrada:', event.code, event.reason)
+          if (event.code !== 1000) { // No es cierre normal
+            reconectar()
+          }
+        }
+
+        websocket.onerror = (error) => {
+          console.warn('⚠️ WebSocket no disponible - funcionando sin notificaciones en tiempo real')
+          // No reconectar automáticamente si hay error de conexión
+        }
+
+        setWs(websocket)
+      } catch (error) {
+        console.warn('⚠️ WebSocket no disponible:', error.message)
+        // No intentar reconectar si hay error inicial
+      }
+    }
+
+    const reconectar = () => {
+      if (reconnectAttempts < 3) { // Reducir intentos
+        const nuevosIntentos = reconnectAttempts + 1
+        setReconnectAttempts(nuevosIntentos)
+        console.log(`🔄 Intento de reconexión WebSocket ${nuevosIntentos}/3`)
+        
+        reconectarTimeout = setTimeout(() => {
+          conectarWebSocket()
+        }, 5000 * nuevosIntentos) // Aumentar delay
+      } else {
+        console.warn('⚠️ WebSocket no disponible - continuando sin notificaciones en tiempo real')
+        // No mostrar modal de sistema inactivo por falta de WebSocket
+      }
+    }
+
+    // Intentar conectar WebSocket
+    conectarWebSocket()
+
+    return () => {
+      if (reconectarTimeout) {
+        clearTimeout(reconectarTimeout)
+      }
+      if (websocket) {
+        websocket.close()
+      }
+    }
+  }, [reconnectAttempts])
+
+  // Verificar estado del sistema
+  const verificarEstadoSistema = async () => {
+    try {
+      const response = await fetch('http://localhost:8081/api/system/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 5000 // 5 segundos timeout
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.systemActive) {
+        setSistemaActivo(true)
+        setMostrarModalSistemaInactivo(false)
+        console.log('✅ Sistema activado nuevamente')
+      } else {
+        setSistemaActivo(false)
+        setMostrarModalSistemaInactivo(true)
+        console.log('❌ Sistema aún inactivo')
+      }
+    } catch (error) {
+      console.warn('⚠️ No se pudo verificar el estado del sistema:', error.message)
+      // Si no puede verificar, asumir que el sistema está activo
+      setSistemaActivo(true)
+      setMostrarModalSistemaInactivo(false)
+    }
+  }
+
+  // Efecto para manejar el contador de redirección
+  useEffect(() => {
+    let interval = null
+    if (mostrarModalRedireccion && contadorRedireccion > 0) {
+      interval = setInterval(() => {
+        setContadorRedireccion(contador => contador - 1)
+      }, 1000)
+    } else if (contadorRedireccion === 0) {
+      // Redireccionar automáticamente
+      window.open('https://linktr.ee/yegooficial', '_blank')
+      setMostrarModalRedireccion(false)
+      setContadorRedireccion(5)
+      
+      // Limpiar formulario después de redirección automática
+      setFormData({
+        licenciaNumero: '',
+        flota: '',
+        terminosAceptados: false
+      })
+      setFlotas([])
+      setErrores({})
+      setLicenciaValidada(false)
+      setDatosDriver(null)
+      setMensajeValidacion('')
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [mostrarModalRedireccion, contadorRedireccion])
+
+  const redirigirAhora = () => {
+    window.open('https://linktr.ee/yegooficial', '_blank')
+    setMostrarModalRedireccion(false)
+    setContadorRedireccion(5)
+    
+    // Limpiar formulario después de redirigir
+    setFormData({
+      licenciaNumero: '',
+      flota: '',
+      terminosAceptados: false
+    })
+    setFlotas([])
+    setErrores({})
+    setLicenciaValidada(false)
+    setDatosDriver(null)
+    setMensajeValidacion('')
+  }
 
   const cargarFlotasConductor = async (licenseNumber) => {
     try {
@@ -94,6 +279,19 @@ export default function Hero() {
           setDatosDriver(null)
           setMensajeValidacion(data.mensaje)
           setErrores(prev => ({ ...prev, licenciaNumero: data.mensaje }))
+          
+          // Mostrar modal de redirección para licencia no válida
+          setMostrarModalRedireccion(true)
+          setContadorRedireccion(5)
+          
+          // Limpiar formulario cuando la licencia no es válida
+          setFormData({
+            licenciaNumero: '',
+            flota: '',
+            terminosAceptados: false
+          })
+          setFlotas([])
+          setErrores({})
         }
       } else {
         throw new Error('Error al validar licencia')
@@ -330,16 +528,16 @@ export default function Hero() {
                       name="licenciaNumero"
                       value={formData.licenciaNumero}
                       onChange={manejarCambio}
-                      disabled={licenciaValidada}
+                      disabled={licenciaValidada || !sistemaActivo}
                       className={`flex-1 px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
                         errores.licenciaNumero ? 'border-red-500' : licenciaValidada ? 'border-green-500 bg-green-50' : 'border-dark'
-                      } ${licenciaValidada ? 'opacity-75' : ''}`}
+                      } ${(licenciaValidada || !sistemaActivo) ? 'opacity-75' : ''}`}
                       placeholder="Ej: ABC123"
                     />
                     <button
                       type="button"
                       onClick={validarLicencia}
-                      disabled={validandoLicencia || licenciaValidada || !formData.licenciaNumero.trim()}
+                      disabled={validandoLicencia || licenciaValidada || !formData.licenciaNumero.trim() || !sistemaActivo}
                       className={`px-6 py-3 font-bold text-sm rounded-xl transition-all duration-300 border-2 ${
                         licenciaValidada 
                           ? 'bg-green-500 text-white border-green-500' 
@@ -379,10 +577,10 @@ export default function Hero() {
                       name="flota"
                       value={formData.flota}
                       onChange={manejarCambio}
-                      disabled={cargandoFlotas}
+                      disabled={cargandoFlotas || !sistemaActivo}
                       className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer bg-white ${
                         errores.flota ? 'border-red-500' : 'border-dark'
-                      } ${cargandoFlotas ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      } ${(cargandoFlotas || !sistemaActivo) ? 'opacity-50 cursor-not-allowed' : ''}`}
                       style={{ 
                         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231A1A1A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                         backgroundRepeat: 'no-repeat',
@@ -415,7 +613,8 @@ export default function Hero() {
                         name="terminosAceptados"
                         checked={formData.terminosAceptados}
                         onChange={manejarCambio}
-                        className="w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer accent-primary"
+                        disabled={!sistemaActivo}
+                        className="w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer accent-primary disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ accentColor: '#FF0000' }}
                       />
                     </div>
@@ -439,7 +638,7 @@ export default function Hero() {
 
                 <button
                   type="submit"
-                  disabled={enviando || !licenciaValidada || !formData.flota || !formData.terminosAceptados}
+                  disabled={enviando || !licenciaValidada || !formData.flota || !formData.terminosAceptados || !sistemaActivo}
                   className="w-full py-4 bg-primary text-white font-bold text-lg rounded-xl transition-all duration-300 hover:bg-primary-dark hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-primary"
                 >
                   {enviando ? (
@@ -472,6 +671,99 @@ export default function Hero() {
           }
         }}
       />
+
+      {/* Modal de Redirección */}
+      {mostrarModalRedireccion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-dark mb-3">
+                Licencia No Encontrada
+              </h2>
+              <p className="text-gray-600 mb-4">
+                Tu licencia no está registrada en nuestro sistema. 
+                Te redirigiremos a nuestra página oficial para que puedas registrarte.
+              </p>
+            </div>
+            
+            <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <p className="text-lg font-bold text-primary">
+                Serás redirigido en {contadorRedireccion} segundos
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={redirigirAhora}
+                className="flex-1 px-4 py-3 rounded-xl font-bold transition-all bg-primary text-white hover:bg-primary-dark"
+              >
+                Ir Ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Sistema Inactivo */}
+      {mostrarModalSistemaInactivo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 text-center">
+            <div className="mb-8">
+              <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h2 className="text-4xl font-black text-dark mb-4">
+                Sistema <span className="text-red-600">Inactivo</span>
+              </h2>
+              <p className="text-xl text-gray-600 mb-6 leading-relaxed">
+                El sistema está temporalmente deshabilitado por mantenimiento o actualización. 
+                Todos los formularios han sido bloqueados hasta nuevo aviso.
+              </p>
+            </div>
+            
+            <div className="mb-8 p-6 bg-red-50 border-2 border-red-200 rounded-2xl">
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-lg font-bold text-red-800">Mantenimiento en Curso</p>
+              </div>
+              <p className="text-red-700 text-sm">
+                Estamos trabajando para mejorar tu experiencia. 
+                Por favor, intenta nuevamente en unos minutos.
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={verificarEstadoSistema}
+                className="px-8 py-4 bg-primary text-white font-bold text-lg rounded-xl hover:bg-primary-dark transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              >
+                🔄 Verificar Estado
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-8 py-4 bg-gray-200 text-dark font-bold text-lg rounded-xl hover:bg-gray-300 transition-all duration-300"
+              >
+                🔄 Recargar Página
+              </button>
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Consejo:</strong> Mantén esta página abierta y el sistema se activará automáticamente cuando esté disponible.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
