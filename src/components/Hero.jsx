@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import ModalTerminos from './ModalTerminos'
 import { API_ENDPOINTS } from '../config/api'
+import useSystemStatus from '../hooks/useSystemStatus'
 
 export default function Hero() {
+  // Hook para manejo del estado del sistema
+  const { isActive, isConnected, isBlocked } = useSystemStatus();
+
   const [formData, setFormData] = useState({
     licenciaNumero: '',
     flota: '',
@@ -26,140 +30,14 @@ export default function Hero() {
   const [mostrarModalRedireccion, setMostrarModalRedireccion] = useState(false)
   const [contadorRedireccion, setContadorRedireccion] = useState(5)
   
-  // Estados para sistema inactivo
+  // Estados para sistema inactivo (mantener para compatibilidad)
   const [sistemaActivo, setSistemaActivo] = useState(true)
-  const [mostrarModalSistemaInactivo, setMostrarModalSistemaInactivo] = useState(false)
-  const [ws, setWs] = useState(null)
-  const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
-  // Ya no cargamos flotas automáticamente
 
-  // Verificar estado inicial del sistema al cargar
+  // Sincronizar con el estado del sistema
   useEffect(() => {
-    verificarEstadoSistema()
-  }, [])
-
-  // WebSocket para sistema inactivo (opcional)
-  useEffect(() => {
-    let websocket = null
-    let reconectarTimeout = null
-
-    const conectarWebSocket = () => {
-      try {
-        websocket = new WebSocket('ws://localhost:8081/api/ws/sistema-externo')
-        
-        websocket.onopen = () => {
-          console.log('✅ Conectado al sistema de notificaciones WebSocket')
-          setReconnectAttempts(0)
-        }
-
-        websocket.onmessage = (event) => {
-          const message = JSON.parse(event.data)
-          console.log('📨 Mensaje WebSocket recibido:', message)
-          
-          switch (message.type) {
-            case 'STATUS_UPDATE':
-              const activo = message.message.includes('ACTIVO')
-              setSistemaActivo(activo)
-              if (!activo) {
-                setMostrarModalSistemaInactivo(true)
-              }
-              break
-            case 'SYSTEM_DEACTIVATED':
-              console.log('🚨 Sistema desactivado via WebSocket:', message.message)
-              setSistemaActivo(false)
-              setMostrarModalSistemaInactivo(true)
-              break
-            case 'STATUS_RESPONSE':
-              const sistemaActivo = message.message.includes('ACTIVO')
-              setSistemaActivo(sistemaActivo)
-              if (!sistemaActivo) {
-                setMostrarModalSistemaInactivo(true)
-              }
-              break
-          }
-        }
-
-        websocket.onclose = (event) => {
-          console.log('🔌 Conexión WebSocket cerrada:', event.code, event.reason)
-          if (event.code !== 1000) { // No es cierre normal
-            reconectar()
-          }
-        }
-
-        websocket.onerror = (error) => {
-          console.warn('⚠️ WebSocket no disponible - funcionando sin notificaciones en tiempo real')
-          // No reconectar automáticamente si hay error de conexión
-        }
-
-        setWs(websocket)
-      } catch (error) {
-        console.warn('⚠️ WebSocket no disponible:', error.message)
-        // No intentar reconectar si hay error inicial
-      }
-    }
-
-    const reconectar = () => {
-      if (reconnectAttempts < 3) { // Reducir intentos
-        const nuevosIntentos = reconnectAttempts + 1
-        setReconnectAttempts(nuevosIntentos)
-        console.log(`🔄 Intento de reconexión WebSocket ${nuevosIntentos}/3`)
-        
-        reconectarTimeout = setTimeout(() => {
-          conectarWebSocket()
-        }, 5000 * nuevosIntentos) // Aumentar delay
-      } else {
-        console.warn('⚠️ WebSocket no disponible - continuando sin notificaciones en tiempo real')
-        // No mostrar modal de sistema inactivo por falta de WebSocket
-      }
-    }
-
-    // Intentar conectar WebSocket
-    conectarWebSocket()
-
-    return () => {
-      if (reconectarTimeout) {
-        clearTimeout(reconectarTimeout)
-      }
-      if (websocket) {
-        websocket.close()
-      }
-    }
-  }, [reconnectAttempts])
-
-  // Verificar estado del sistema
-  const verificarEstadoSistema = async () => {
-    try {
-      const response = await fetch('http://localhost:8081/api/system/status', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 5000 // 5 segundos timeout
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      const data = await response.json()
-      
-      if (data.systemActive) {
-        setSistemaActivo(true)
-        setMostrarModalSistemaInactivo(false)
-        console.log('✅ Sistema activado nuevamente')
-      } else {
-        setSistemaActivo(false)
-        setMostrarModalSistemaInactivo(true)
-        console.log('❌ Sistema aún inactivo')
-      }
-    } catch (error) {
-      console.warn('⚠️ No se pudo verificar el estado del sistema:', error.message)
-      // Si no puede verificar, asumir que el sistema está activo
-      setSistemaActivo(true)
-      setMostrarModalSistemaInactivo(false)
-    }
-  }
+    setSistemaActivo(isActive);
+  }, [isActive]);
 
   // Efecto para manejar el contador de redirección
   useEffect(() => {
@@ -350,6 +228,14 @@ export default function Hero() {
   const manejarEnvio = async (e) => {
     e.preventDefault()
     
+    // Verificar si el sistema está bloqueado
+    if (isBlocked || !isActive) {
+      setErrores({
+        sistema: 'El sistema está temporalmente desactivado. No se pueden procesar solicitudes en este momento.'
+      })
+      return
+    }
+    
     const nuevosErrores = validarFormulario()
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores)
@@ -518,6 +404,24 @@ export default function Hero() {
               </h2>
 
               <form onSubmit={manejarEnvio} className="space-y-6">
+Ç                {/* Error del sistema */}
+                {errores.sistema && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-800 font-medium">
+                          {errores.sistema}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div>
                   <label className="block text-sm font-bold text-dark mb-2">
                     Número de Licencia *
@@ -709,61 +613,6 @@ export default function Hero() {
         </div>
       )}
 
-      {/* Modal de Sistema Inactivo */}
-      {mostrarModalSistemaInactivo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 text-center">
-            <div className="mb-8">
-              <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h2 className="text-4xl font-black text-dark mb-4">
-                Sistema <span className="text-red-600">Inactivo</span>
-              </h2>
-              <p className="text-xl text-gray-600 mb-6 leading-relaxed">
-                El sistema está temporalmente deshabilitado por mantenimiento o actualización. 
-                Todos los formularios han sido bloqueados hasta nuevo aviso.
-              </p>
-            </div>
-            
-            <div className="mb-8 p-6 bg-red-50 border-2 border-red-200 rounded-2xl">
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-lg font-bold text-red-800">Mantenimiento en Curso</p>
-              </div>
-              <p className="text-red-700 text-sm">
-                Estamos trabajando para mejorar tu experiencia. 
-                Por favor, intenta nuevamente en unos minutos.
-              </p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={verificarEstadoSistema}
-                className="px-8 py-4 bg-primary text-white font-bold text-lg rounded-xl hover:bg-primary-dark transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-              >
-                🔄 Verificar Estado
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-8 py-4 bg-gray-200 text-dark font-bold text-lg rounded-xl hover:bg-gray-300 transition-all duration-300"
-              >
-                🔄 Recargar Página
-              </button>
-            </div>
-
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <p className="text-sm text-blue-800">
-                <strong>💡 Consejo:</strong> Mantén esta página abierta y el sistema se activará automáticamente cuando esté disponible.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
