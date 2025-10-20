@@ -404,7 +404,7 @@ export default function Hero() {
               </h2>
 
               <form onSubmit={manejarEnvio} className="space-y-6">
-Ç                {/* Error del sistema */}
+            {/* Error del sistema */}
                 {errores.sistema && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                     <div className="flex items-center">
