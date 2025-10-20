@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react'
 import ModalTerminos from './ModalTerminos'
 import { API_ENDPOINTS } from '../config/api'
-import useSystemStatus from '../hooks/useSystemStatus'
-
-export default function Hero() {
-  // Hook para manejo del estado del sistema
-  const { isActive, isConnected, isBlocked } = useSystemStatus();
+export default function Hero({ isActive, isConnected }) {
 
   const [formData, setFormData] = useState({
     licenciaNumero: '',
@@ -216,7 +212,7 @@ export default function Hero() {
     e.preventDefault()
     
     // Verificar si el sistema está bloqueado
-    if (isBlocked || !isActive) {
+    if (!isActive) {
       setErrores({
         sistema: 'El sistema está temporalmente desactivado. No se pueden procesar solicitudes en este momento.'
       })

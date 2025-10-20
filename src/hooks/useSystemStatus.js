@@ -4,18 +4,37 @@ import authService from '../services/authService';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 
+// Flag global para evitar múltiples inicializaciones
+let isInitialized = false;
+let initializationPromise = null;
+
 const useSystemStatus = () => {
     const [isActive, setIsActive] = useState(true);
     const [isConnected, setIsConnected] = useState(false);
     const [notification, setNotification] = useState(null);
     const [systemMessage, setSystemMessage] = useState(null);
     const [showInactiveModal, setShowInactiveModal] = useState(false);
+    const [isChecking, setIsChecking] = useState(false);
 
     // Verificar estado del sistema desde el backend
     const checkSystemStatus = useCallback(async () => {
+        // Evitar múltiples llamadas simultáneas
+        if (isChecking) {
+            console.log('⏳ Ya hay una verificación en curso, omitiendo...');
+            return;
+        }
+        
+        // BLOQUEO DRÁSTICO: Verificar token ANTES de hacer cualquier solicitud
+        const token = authService.getToken();
+        if (!token || token.trim() === '') {
+            console.log('🚫 BLOQUEADO: No hay token válido, cancelando solicitud');
+            setIsConnected(false);
+            return;
+        }
+        
+        setIsChecking(true);
+        
         try {
-            // Obtener token para autenticación
-            const token = authService.getToken();
             
             const response = await fetch(`${API_ENDPOINTS.GARANTIZADO_BASE_URL}${API_ENDPOINTS.GARANTIZADO.SYSTEM_STATUS}`, {
                 method: 'GET',
@@ -48,8 +67,10 @@ const useSystemStatus = () => {
         } catch (error) {
             console.warn('⚠️ Error verificando estado del sistema:', error.message);
             setIsConnected(false);
+        } finally {
+            setIsChecking(false);
         }
-    }, []);
+    }, [isChecking]);
 
     // Configurar STOMP WebSocket para recibir notificaciones
     useEffect(() => {
@@ -180,26 +201,34 @@ const useSystemStatus = () => {
 
     // Verificar estado inicial
     useEffect(() => {
-        console.log('🚀 Inicializando useSystemStatus...');
-        
-        // Generar token si no existe
-        if (!authService.isAuthenticated()) {
-            console.log('🔐 Generando token inicial...');
-            authService.generateWebSocketToken();
+        // BLOQUEO GLOBAL: Solo permitir una inicialización
+        if (isInitialized) {
+            console.log('🚫 BLOQUEADO: useSystemStatus ya fue inicializado');
+            return;
         }
         
-        checkSystemStatus();
+        if (initializationPromise) {
+            console.log('⏳ BLOQUEADO: Inicialización ya en progreso');
+            return;
+        }
+        
+        console.log('🚀 Inicializando useSystemStatus...');
+        isInitialized = true;
+        
+        initializationPromise = (async () => {
+            // Esperar un poco antes de hacer la solicitud
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Generar token si no existe
+            if (!authService.isAuthenticated()) {
+                console.log('🔐 Generando token inicial...');
+                authService.generateWebSocketToken();
+            }
+            
+            await checkSystemStatus();
+        })();
     }, [checkSystemStatus]);
 
-    // Forzar consulta inicial después de un breve delay
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            console.log('🔄 Forzando consulta inicial...');
-            checkSystemStatus();
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-    }, []);
 
 
     // Limpiar notificación

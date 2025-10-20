@@ -120,7 +120,7 @@ function App() {
         <Route path="/" element={<Navigate to="/garantizado" replace />} />
         <Route path="/garantizado" element={
           <div className="min-h-screen flex flex-col">
-            <Hero />
+            <Hero isActive={isActive} isConnected={isConnected} />
             <Footer />
           </div>
         } />
