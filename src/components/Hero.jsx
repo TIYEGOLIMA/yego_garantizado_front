@@ -910,7 +910,7 @@ export default function Hero() {
               
               {/* Paso Opcional */}
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">O si prefieres</p>
+                <p className="text-sm font-medium text-gray-500 mb-2">Paso 2 (opcional)</p>
                 <button
                   onClick={() => {
                     window.open('https://wa.me/+5190545977', '_blank')
