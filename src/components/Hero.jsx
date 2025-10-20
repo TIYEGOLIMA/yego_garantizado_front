@@ -28,10 +28,42 @@ export default function Hero() {
   
   // Estados para modal de redirección
   const [mostrarModalRedireccion, setMostrarModalRedireccion] = useState(false)
-  const [contadorRedireccion, setContadorRedireccion] = useState(5)
+  
+  // Estados para modal de conductor ya registrado
+  const [mostrarModalYaRegistrado, setMostrarModalYaRegistrado] = useState(false)
   
   // Estados para sistema inactivo (mantener para compatibilidad)
   const [sistemaActivo, setSistemaActivo] = useState(true)
+
+  // Función para calcular las fechas de la semana actual
+  const calcularFechasSemanaActual = () => {
+    const hoy = new Date()
+    const año = hoy.getFullYear()
+    
+    // Obtener el número de semana actual
+    const obtenerNumeroSemana = (fecha) => {
+      const inicioAño = new Date(fecha.getFullYear(), 0, 1)
+      const diasTranscurridos = Math.floor((fecha - inicioAño) / (24 * 60 * 60 * 1000))
+      return Math.ceil((diasTranscurridos + inicioAño.getDay() + 1) / 7)
+    }
+    
+    const numeroSemana = obtenerNumeroSemana(hoy)
+    
+    // Calcular el lunes de la semana actual
+    const diaSemana = hoy.getDay() // 0 = domingo, 1 = lunes, etc.
+    const diasHastaLunes = diaSemana === 0 ? -6 : 1 - diaSemana // Si es domingo, retroceder 6 días
+    const lunesSemanaActual = new Date(hoy.getTime() + diasHastaLunes * 24 * 60 * 60 * 1000)
+    const domingoSemanaActual = new Date(lunesSemanaActual.getTime() + 6 * 24 * 60 * 60 * 1000)
+    
+    const formatearFecha = (fecha) => {
+      return fecha.toLocaleDateString('es-ES', { 
+        day: '2-digit', 
+        month: '2-digit' 
+      })
+    }
+    
+    return `${formatearFecha(lunesSemanaActual)} al ${formatearFecha(domingoSemanaActual)}`
+  }
 
 
   // Sincronizar con el estado del sistema
@@ -39,53 +71,6 @@ export default function Hero() {
     setSistemaActivo(isActive);
   }, [isActive]);
 
-  // Efecto para manejar el contador de redirección
-  useEffect(() => {
-    let interval = null
-    if (mostrarModalRedireccion && contadorRedireccion > 0) {
-      interval = setInterval(() => {
-        setContadorRedireccion(contador => contador - 1)
-      }, 1000)
-    } else if (contadorRedireccion === 0) {
-      // Redireccionar automáticamente
-      window.open('https://linktr.ee/yegooficial', '_blank')
-      setMostrarModalRedireccion(false)
-      setContadorRedireccion(5)
-      
-      // Limpiar formulario después de redirección automática
-      setFormData({
-        licenciaNumero: '',
-        flota: '',
-        terminosAceptados: false
-      })
-      setFlotas([])
-      setErrores({})
-      setLicenciaValidada(false)
-      setDatosDriver(null)
-      setMensajeValidacion('')
-    }
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [mostrarModalRedireccion, contadorRedireccion])
-
-  const redirigirAhora = () => {
-    window.open('https://linktr.ee/yegooficial', '_blank')
-    setMostrarModalRedireccion(false)
-    setContadorRedireccion(5)
-    
-    // Limpiar formulario después de redirigir
-    setFormData({
-      licenciaNumero: '',
-      flota: '',
-      terminosAceptados: false
-    })
-    setFlotas([])
-    setErrores({})
-    setLicenciaValidada(false)
-    setDatosDriver(null)
-    setMensajeValidacion('')
-  }
 
   const cargarFlotasConductor = async (licenseNumber) => {
     try {
@@ -150,17 +135,19 @@ export default function Hero() {
           setMensajeValidacion(data.mensaje)
           setErrores(prev => ({ ...prev, licenciaNumero: '' }))
           
+          // No mostrar mensaje de validación
+          setMensajeValidacion('')
+          
           // Paso 2: Cargar flotas específicas del conductor
           await cargarFlotasConductor(formData.licenciaNumero)
         } else {
           setLicenciaValidada(false)
           setDatosDriver(null)
           setMensajeValidacion(data.mensaje)
-          setErrores(prev => ({ ...prev, licenciaNumero: data.mensaje }))
+          setErrores({}) // Limpiar errores cuando la licencia no es encontrada
           
           // Mostrar modal de redirección para licencia no válida
           setMostrarModalRedireccion(true)
-          setContadorRedireccion(5)
           
           // Limpiar formulario cuando la licencia no es válida
           setFormData({
@@ -169,7 +156,6 @@ export default function Hero() {
             terminosAceptados: false
           })
           setFlotas([])
-          setErrores({})
         }
       } else {
         throw new Error('Error al validar licencia')
@@ -186,9 +172,10 @@ export default function Hero() {
 
   const manejarCambio = (e) => {
     const { name, value, type, checked } = e.target
+    const nuevoValor = type === 'checkbox' ? checked : (name === 'licenciaNumero' ? value.toUpperCase() : value)
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: nuevoValor
     }))
     
     // Si cambia la licencia, resetear la validación y flotas
@@ -277,9 +264,14 @@ export default function Hero() {
         
         setTimeout(() => {
           setExitoso(false)
-        }, 3000)
+        }, 10000)
+      } else {
+        // Manejar error 409 - Conductor ya registrado
+        if (response.status === 409) {
+          setMostrarModalYaRegistrado(true)
       } else {
         alert(resultado.mensaje || 'Error al registrar')
+        }
       }
     } catch (error) {
       console.error('Error al enviar registro:', error)
@@ -303,8 +295,11 @@ export default function Hero() {
       </div>
       
       <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-4">
-        <div className="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
-        <div className="text-dark space-y-8 animate-fade-in">
+        <div className="max-w-7xl mx-auto w-full">
+          {/* Layout móvil: título -> formulario -> iconos */}
+          <div className="lg:hidden space-y-8">
+            {/* Título y descripción */}
+            <div className="text-dark space-y-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-5 py-2 bg-white border-2 border-dark rounded-full text-sm font-bold">
             <div className="w-2 h-2 bg-primary rounded-full"></div>
             <span className="text-dark">ÚNETE AL EQUIPO</span>
@@ -321,66 +316,10 @@ export default function Hero() {
             Genera ingresos flexibles manejando tu propio horario. 
             Sistema de garantizado atractivo y pagos puntuales.
           </p>
+            </div>
           
-          <div className="flex flex-wrap gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
-                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-bold text-dark">Garantizado</p>
-                <p className="text-sm text-gray-500">Ingresos seguros</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
-                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-bold text-dark">Pagos rápidos</p>
-                <p className="text-sm text-gray-500">Sin demoras</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
-                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-bold text-dark">App fácil</p>
-                <p className="text-sm text-gray-500">Interfaz simple</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Gratis
-            </span>
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Sin compromiso
-            </span>
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Inicio inmediato
-            </span>
-          </div>
-        </div>
-        
-        <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            {/* Formulario en móvil */}
+          <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
           {exitoso ? (
             <div className="bg-white rounded-2xl shadow-2xl p-8 text-center border-2 border-primary">
               <div className="mb-6">
@@ -392,9 +331,25 @@ export default function Hero() {
                 <h2 className="text-3xl font-bold text-dark mb-3">
                   ¡Registro <span className="text-primary">Aprobado!</span>
                 </h2>
-                <p className="text-gray-600">
-                  Nos pondremos en contacto contigo pronto.
-                </p>
+                <div className="space-y-3 text-gray-600">
+                  <p className="font-medium">
+                    Ya estás registrado en el Garantizado de la semana del {calcularFechasSemanaActual()}
+                  </p>
+                  <p className="text-sm">
+                    ¿No estás seguro que estás conduciendo en Yango con Yego?
+                  </p>
+                  <p className="text-sm">
+                    Chatea con Nosotros aquí:{' '}
+                    <a 
+                      href="https://wa.me/+5190545977" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary font-bold hover:underline"
+                    >
+                      +5190545977
+                    </a>
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -433,10 +388,10 @@ export default function Hero() {
                       value={formData.licenciaNumero}
                       onChange={manejarCambio}
                       disabled={licenciaValidada || !sistemaActivo}
-                      className={`flex-1 px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
+                      className={`flex-1 px-4 py-3 text-base uppercase border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
                         errores.licenciaNumero ? 'border-red-500' : licenciaValidada ? 'border-green-500 bg-green-50' : 'border-dark'
                       } ${(licenciaValidada || !sistemaActivo) ? 'opacity-75' : ''}`}
-                      placeholder="Ej: ABC123"
+                      placeholder="Ej: K12345678"
                     />
                     <button
                       type="button"
@@ -464,11 +419,6 @@ export default function Hero() {
                     <p className="mt-2 text-sm text-red-500 font-medium">
                       {errores.licenciaNumero}
                     </p>
-                  )}
-                  {licenciaValidada && mensajeValidacion && (
-                    <div className="mt-1 pl-2  rounded-xl">
-                      <p className="font-bold text-green-700">{mensajeValidacion}</p>
-                    </div>
                   )}
                 </div>
 
@@ -560,9 +510,342 @@ export default function Hero() {
               </form>
             </div>
           )}
+          </div>
+          
+            {/* Iconos de características - solo visibles en móvil, después del formulario */}
+            <div className="flex flex-wrap gap-6">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-bold text-dark">Garantizado</p>
+                  <p className="text-sm text-gray-500">Ingresos seguros</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-bold text-dark">Pagos rápidos</p>
+                  <p className="text-sm text-gray-500">Sin demoras</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-bold text-dark">App fácil</p>
+                  <p className="text-sm text-gray-500">Interfaz simple</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Gratis
+              </span>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Sin compromiso
+              </span>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Inicio inmediato
+              </span>
+            </div>
+          </div>
+
+          {/* Layout desktop: dos columnas */}
+          <div className="hidden lg:grid lg:grid-cols-2 gap-12 items-center">
+            {/* Contenido principal - izquierda en desktop */}
+            <div className="text-dark space-y-8 animate-fade-in">
+              <div className="inline-flex items-center gap-2 px-5 py-2 bg-white border-2 border-dark rounded-full text-sm font-bold">
+                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                <span className="text-dark">ÚNETE AL EQUIPO</span>
+              </div>
+              
+              <h1 className="text-5xl md:text-7xl font-black leading-tight text-dark">
+                Conduce y Gana tu{' '}
+                <span className="text-primary">Bono</span>
+                <br />
+                Garantizado
+              </h1>
+              
+              <p className="text-xl text-gray-600 leading-relaxed">
+                Genera ingresos flexibles manejando tu propio horario. 
+                Sistema de garantizado atractivo y pagos puntuales.
+              </p>
+              
+              {/* Iconos de características - solo visibles en desktop */}
+          <div className="flex flex-wrap gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-dark">Garantizado</p>
+                <p className="text-sm text-gray-500">Ingresos seguros</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-dark">Pagos rápidos</p>
+                <p className="text-sm text-gray-500">Sin demoras</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white border-2 border-dark rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-dark">App fácil</p>
+                <p className="text-sm text-gray-500">Interfaz simple</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6 text-sm font-medium text-gray-600">
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Gratis
+            </span>
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Sin compromiso
+            </span>
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Inicio inmediato
+            </span>
+          </div>
         </div>
+        
+            {/* Formulario de registro - derecha en desktop */}
+            <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              {exitoso ? (
+                <div className="bg-white rounded-2xl shadow-2xl p-8 text-center border-2 border-primary">
+                  <div className="mb-6">
+                    <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <h2 className="text-3xl font-bold text-dark mb-3">
+                      ¡Registro <span className="text-primary">Aprobado!</span>
+                    </h2>
+                    <div className="space-y-3 text-gray-600">
+                      <p className="font-medium">
+                        Ya estás registrado en el Garantizado de la semana del {calcularFechasSemanaActual()}
+                      </p>
+                      <p className="text-sm">
+                        ¿No estás seguro que estás conduciendo en Yango con Yego?
+                      </p>
+                      <p className="text-sm">
+                        Chatea con Nosotros aquí:{' '}
+                        <a 
+                          href="https://wa.me/+5190545977" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary font-bold hover:underline"
+                        >
+                          +5190545977
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl shadow-2xl p-8">
+                  <h2 className="text-3xl font-bold text-dark mb-6 text-center">
+                    <span className="text-primary">Regístrate</span> Ahora
+                  </h2>
+
+                  <form onSubmit={manejarEnvio} className="space-y-6">
+                {/* Error del sistema */}
+                    {errores.sistema && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm text-red-800 font-medium">
+                              {errores.sistema}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <label className="block text-sm font-bold text-dark mb-2">
+                        Número de Licencia *
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          name="licenciaNumero"
+                          value={formData.licenciaNumero}
+                          onChange={manejarCambio}
+                          disabled={licenciaValidada || !sistemaActivo}
+                          className={`flex-1 px-4 py-3 text-base uppercase border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${
+                            errores.licenciaNumero ? 'border-red-500' : licenciaValidada ? 'border-green-500 bg-green-50' : 'border-dark'
+                          } ${(licenciaValidada || !sistemaActivo) ? 'opacity-75' : ''}`}
+                          placeholder="Ej: K12345678"
+                        />
+                        <button
+                          type="button"
+                          onClick={validarLicencia}
+                          disabled={validandoLicencia || licenciaValidada || !formData.licenciaNumero.trim() || !sistemaActivo}
+                          className={`px-6 py-3 font-bold text-sm rounded-xl transition-all duration-300 border-2 ${
+                            licenciaValidada 
+                              ? 'bg-green-500 text-white border-green-500' 
+                              : 'bg-primary text-white border-primary hover:bg-primary-dark hover:-translate-y-0.5'
+                          } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+                        >
+                          {validandoLicencia ? (
+                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                          ) : licenciaValidada ? (
+                            '✓'
+                          ) : (
+                            'Validar'
+                          )}
+                        </button>
+                      </div>
+                      {errores.licenciaNumero && (
+                        <p className="mt-2 text-sm text-red-500 font-medium">
+                          {errores.licenciaNumero}
+                        </p>
+                      )}
+                    </div>
+
+                    {licenciaValidada && (
+                      <div>
+                        <label className="block text-sm font-bold text-dark mb-2">
+                          Seleccionar Flota *
+                        </label>
+                        <select
+                          name="flota"
+                          value={formData.flota}
+                          onChange={manejarCambio}
+                          disabled={cargandoFlotas || !sistemaActivo}
+                          className={`w-full px-4 py-3 text-base border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer bg-white ${
+                            errores.flota ? 'border-red-500' : 'border-dark'
+                          } ${(cargandoFlotas || !sistemaActivo) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          style={{ 
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231A1A1A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 1rem center',
+                            backgroundSize: '1.5rem'
+                          }}
+                        >
+                          <option value="">
+                            {cargandoFlotas ? 'Cargando tus flotas...' : 'Selecciona tu flota'}
+                          </option>
+                          {flotas.map((flota) => (
+                            <option key={flota.id} value={flota.id}>
+                              {flota.name}
+                            </option>
+                          ))}
+                        </select>
+                        {errores.flota && (
+                          <p className="mt-2 text-sm text-red-500 font-medium">
+                            {errores.flota}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className="relative flex-shrink-0 mt-0.5">
+                          <input
+                            type="checkbox"
+                            name="terminosAceptados"
+                            checked={formData.terminosAceptados}
+                            onChange={manejarCambio}
+                            disabled={!sistemaActivo}
+                            className="w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer accent-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ accentColor: '#FF0000' }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-700 leading-relaxed">
+                          Acepto los{' '}
+                          <button 
+                            type="button"
+                            onClick={() => setMostrarTerminos(true)}
+                            className="text-primary font-bold hover:underline"
+                          >
+                            términos y condiciones
+                          </button>
+                        </span>
+                      </label>
+                      {errores.terminosAceptados && (
+                        <p className="mt-2 text-sm text-red-500 font-medium ml-8">
+                          {errores.terminosAceptados}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={enviando || !licenciaValidada || !formData.flota || !formData.terminosAceptados || !sistemaActivo}
+                      className="w-full py-4 bg-primary text-white font-bold text-lg rounded-xl transition-all duration-300 hover:bg-primary-dark hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-primary"
+                    >
+                      {enviando ? (
+                        <span className="flex items-center justify-center gap-3">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Procesando...
+                        </span>
+                      ) : (
+                        'Enviar Registro'
+                      )}
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
       
       <ModalTerminos 
         mostrar={mostrarTerminos} 
@@ -576,43 +859,135 @@ export default function Hero() {
         }}
       />
 
-      {/* Modal de Redirección */}
+      {/* Modal de Licencia No Encontrada */}
       {mostrarModalRedireccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-            <div className="mb-6">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center border-2 border-dark">
+            <div className="mb-8">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <div className="w-4 h-4 bg-white rounded-full"></div>
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-dark mb-3">
+              
+              <h2 className="text-3xl font-bold text-dark mb-4">
                 Licencia No Encontrada
               </h2>
-              <p className="text-gray-600 mb-4">
-                Tu licencia no está registrada en nuestro sistema. 
-                Te redirigiremos a nuestra página oficial para que puedas registrarte.
+              
+              <p className="text-lg text-gray-600 leading-relaxed mb-2">
+                Tu licencia no está registrada en nuestro sistema.
+              </p>
+              
+              <p className="text-base text-gray-500">
+                Te ayudamos a registrarte o contactar con nuestros asesores.
               </p>
             </div>
             
-            <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-              <p className="text-lg font-bold text-primary">
-                Serás redirigido en {contadorRedireccion} segundos
-              </p>
+            <div className="space-y-4">
+              {/* Opción Principal */}
+              <div>
+                <button
+                  onClick={() => {
+                    window.open('https://linktr.ee/yegooficial', '_blank')
+                    setMostrarModalRedireccion(false)
+                    // Limpiar formulario y errores
+                    setFormData({
+                      licenciaNumero: '',
+                      flota: '',
+                      terminosAceptados: false
+                    })
+                    setLicenciaValidada(false)
+                    setDatosDriver(null)
+                    setMensajeValidacion('')
+                    setFlotas([])
+                    setErrores({})
+                  }}
+                  className="w-3/4 mx-auto py-3 px-4 rounded-lg font-bold text-sm transition-all duration-300 bg-primary text-white hover:bg-primary-dark hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 border-2 border-primary"
+                >
+                  Regístrate con Nosotros
+                </button>
+              </div>
+              
+              {/* Paso Opcional */}
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-2">O si prefieres</p>
+                <button
+                  onClick={() => {
+                    window.open('https://wa.me/+5190545977', '_blank')
+                    setMostrarModalRedireccion(false)
+                    // Limpiar formulario y errores
+                    setFormData({
+                      licenciaNumero: '',
+                      flota: '',
+                      terminosAceptados: false
+                    })
+                    setLicenciaValidada(false)
+                    setDatosDriver(null)
+                    setMensajeValidacion('')
+                    setFlotas([])
+                    setErrores({})
+                  }}
+                  className="w-3/4 mx-auto py-3 px-4 rounded-lg font-bold text-sm transition-all duration-300 bg-white text-dark border-2 border-gray-300 hover:bg-gray-50 hover:border-dark hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  Contacta a un Asesor
+                </button>
+              </div>
             </div>
             
-            <div className="flex gap-3">
-              <button
-                onClick={redirigirAhora}
-                className="flex-1 px-4 py-3 rounded-xl font-bold transition-all bg-primary text-white hover:bg-primary-dark"
-              >
-                Ir Ahora
-              </button>
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-400">
+                ¿Necesitas ayuda? Nuestro equipo está aquí para ti
+              </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* Modal de Conductor Ya Registrado */}
+      {mostrarModalYaRegistrado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-dark mb-3">
+                ¡Ya estás registrado! 🎉
+              </h2>
+              <p className="text-gray-600 mb-4">
+                Tu número de licencia <span className="font-bold text-primary">{formData.licenciaNumero}</span> ya ha sido registrado para esta semana de garantizado.
+              </p>
+              <p className="text-sm text-gray-500">
+                No es necesario registrarse nuevamente. Te contactaremos pronto con los detalles de tu bono garantizado.
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setMostrarModalYaRegistrado(false)
+                  // Limpiar formulario
+                  setFormData({
+                    licenciaNumero: '',
+                    flota: '',
+                    terminosAceptados: false
+                  })
+                  setLicenciaValidada(false)
+                  setDatosDriver(null)
+                  setMensajeValidacion('')
+                  setFlotas([])
+                }}
+                className="flex-1 px-6 py-3 rounded-xl font-bold transition-all bg-primary text-white hover:bg-primary-dark"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
     </div>
   )
 }
