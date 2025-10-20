@@ -1,8 +1,15 @@
-const API_BASE_URL = 'http://localhost:8081'
+// Configuración centralizada
+import { API_CONFIG } from './environment.js';
+
+const API_BASE_URL = API_CONFIG.baseUrl;
+const WS_BASE_URL = API_CONFIG.wsUrl;
 
 export const API_ENDPOINTS = {
-  // Backend Garantizado (puerto 8081) - HTTP
-  GARANTIZADO_BASE_URL: 'http://localhost:8081',
+  // Backend Garantizado - HTTP
+  GARANTIZADO_BASE_URL: API_BASE_URL,
+  
+  // WebSocket
+  WS_BASE_URL: WS_BASE_URL,
   
   // Endpoints específicos
   GARANTIZADO: {

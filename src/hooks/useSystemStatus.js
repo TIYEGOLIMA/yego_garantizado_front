@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_ENDPOINTS } from '../config/api';
+import authService from '../services/authService';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
 
 const useSystemStatus = () => {
     const [isActive, setIsActive] = useState(true);
@@ -10,10 +14,14 @@ const useSystemStatus = () => {
     // Verificar estado del sistema desde el backend
     const checkSystemStatus = useCallback(async () => {
         try {
-            const response = await fetch('http://localhost:8081/api/system/status', {
+            // Obtener token para autenticación
+            const token = authService.getToken();
+            
+            const response = await fetch(`${API_ENDPOINTS.GARANTIZADO_BASE_URL}${API_ENDPOINTS.GARANTIZADO.SYSTEM_STATUS}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
                 },
             });
             
@@ -43,94 +51,129 @@ const useSystemStatus = () => {
         }
     }, []);
 
-    // Configurar WebSocket para recibir notificaciones
+    // Configurar STOMP WebSocket para recibir notificaciones
     useEffect(() => {
-        let ws = null;
+        let stompClient = null;
         let reconnectTimeout = null;
-        let isConnecting = false;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 3;
         
-        const connectWebSocket = () => {
+        const connectStomp = () => {
             // Evitar múltiples conexiones
-            if (isConnecting || (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN))) {
+            if (stompClient && stompClient.connected) {
                 return;
             }
             
-            isConnecting = true;
-            reconnectAttempts++;
-            
             try {
-                ws = new WebSocket('ws://localhost:8081/ws');
+                // Generar token JWT para WebSocket
+                const token = authService.generateWebSocketToken();
+                console.log('🔐 [STOMP] Token generado para conexión:', token ? 'Sí' : 'No');
+                console.log('🌐 [STOMP] URL WebSocket:', API_ENDPOINTS.WS_BASE_URL);
                 
-                ws.onopen = () => {
-                    console.log('✅ WebSocket conectado');
+                 // Usar URL centralizada de configuración
+                 const stompUrl = API_ENDPOINTS.WS_BASE_URL;
+                 console.log('🌐 [STOMP] URL WebSocket:', stompUrl);
+                 
+                 stompClient = new Client({
+                     webSocketFactory: () => new SockJS(stompUrl),
+                     connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+                     debug: (str) => console.log('STOMP:', str),
+                     reconnectDelay: 5000,
+                     heartbeatIncoming: 4000,
+                     heartbeatOutgoing: 4000,
+                 });
+                
+                stompClient.onConnect = (frame) => {
+                    console.log('✅ STOMP conectado:', frame);
                     setIsConnected(true);
-                    isConnecting = false;
-                    reconnectAttempts = 0; // Reset attempts on successful connection
-                };
-                
-                ws.onmessage = (event) => {
-                    try {
-                        const message = JSON.parse(event.data);
-                        console.log('📨 Mensaje WebSocket recibido:', message);
-                        
-                        // Procesar mensaje según el tipo
-                        if (message.type === 'SYSTEM_DEACTIVATED') {
-                            // Sistema se desactiva - mostrar modal
-                            setIsActive(false);
-                            
-                            // Usar directamente los datos del WebSocket
-                            setSystemMessage(message);
-                            setShowInactiveModal(true);
-                            showNotification('Sistema Desactivado', message.message, 'warning', 0);
-                        } else if (message.type === 'SYSTEM_ACTIVATED') {
-                            // Sistema se activa - ocultar modal automáticamente
-                            setIsActive(true);
-                            setSystemMessage(null);
-                            setShowInactiveModal(false);
-                            showNotification('Sistema Activado', message.message, 'success', 5000);
-                        }
-                    } catch (error) {
-                        console.error('❌ Error parseando mensaje WebSocket:', error);
-                    }
-                };
-                
-                ws.onclose = () => {
-                    console.log('🔌 WebSocket desconectado');
-                    setIsConnected(false);
-                    isConnecting = false;
+                    reconnectAttempts = 0;
                     
-                    // Solo reconectar si no hemos excedido el límite
+                    // Suscribirse a los tópicos del sistema
+                    stompClient.subscribe('/topic/system', (message) => {
+                        try {
+                            const data = JSON.parse(message.body);
+                            console.log('📨 Mensaje STOMP recibido en /topic/system:', data);
+                            handleSystemMessage(data);
+                        } catch (error) {
+                            console.error('❌ Error parseando mensaje STOMP:', error);
+                        }
+                    });
+                    
+                    stompClient.subscribe('/topic/garantizado', (message) => {
+                        try {
+                            const data = JSON.parse(message.body);
+                            console.log('📨 Mensaje STOMP recibido en /topic/garantizado:', data);
+                            handleSystemMessage(data);
+                        } catch (error) {
+                            console.error('❌ Error parseando mensaje STOMP:', error);
+                        }
+                    });
+                    
+                    stompClient.subscribe('/topic/system-status', (message) => {
+                        try {
+                            const data = JSON.parse(message.body);
+                            console.log('📨 Mensaje STOMP recibido en /topic/system-status:', data);
+                            handleSystemMessage(data);
+                        } catch (error) {
+                            console.error('❌ Error parseando mensaje STOMP:', error);
+                        }
+                    });
+                };
+                
+                stompClient.onStompError = (frame) => {
+                    console.error('❌ Error STOMP:', frame.headers.message);
+                    setIsConnected(false);
+                };
+                
+                stompClient.onWebSocketClose = (event) => {
+                    console.log('🔌 STOMP desconectado:', event);
+                    setIsConnected(false);
+                    
+                    // Reconectar si no hemos excedido el límite
                     if (reconnectAttempts < maxReconnectAttempts) {
-                        console.log(`🔄 Reintentando conexión (${reconnectAttempts}/${maxReconnectAttempts})...`);
-                        reconnectTimeout = setTimeout(connectWebSocket, 5000);
+                        console.log(`🔄 Reintentando conexión STOMP (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                        reconnectAttempts++;
+                        reconnectTimeout = setTimeout(connectStomp, 5000);
                     } else {
-                        console.log('❌ Máximo de intentos de reconexión alcanzado');
+                        console.log('❌ Máximo de intentos de reconexión STOMP alcanzado');
                     }
                 };
                 
-                ws.onerror = (error) => {
-                    console.log('⚠️ Error WebSocket - intentando reconectar...');
-                    setIsConnected(false);
-                    isConnecting = false;
-                };
+                // Conectar
+                stompClient.activate();
                 
             } catch (error) {
-                console.log('⚠️ Error conectando WebSocket:', error);
-                isConnecting = false;
+                console.log('⚠️ Error conectando STOMP:', error);
+                setIsConnected(false);
             }
         };
         
-        // Conectar WebSocket
-        connectWebSocket();
+        // Función para manejar mensajes del sistema
+        const handleSystemMessage = (message) => {
+            if (message.type === 'SYSTEM_DEACTIVATED') {
+                // Sistema se desactiva - mostrar modal
+                setIsActive(false);
+                setSystemMessage(message);
+                setShowInactiveModal(true);
+                showNotification('Sistema Desactivado', message.message, 'warning', 0);
+            } else if (message.type === 'SYSTEM_ACTIVATED') {
+                // Sistema se activa - ocultar modal automáticamente
+                setIsActive(true);
+                setSystemMessage(null);
+                setShowInactiveModal(false);
+                showNotification('Sistema Activado', message.message, 'success', 5000);
+            }
+        };
+        
+        // Conectar STOMP
+        connectStomp();
         
         return () => {
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
             }
-            if (ws) {
-                ws.close();
+            if (stompClient) {
+                stompClient.deactivate();
             }
         };
     }, []); // Solo ejecutar una vez
@@ -138,6 +181,13 @@ const useSystemStatus = () => {
     // Verificar estado inicial
     useEffect(() => {
         console.log('🚀 Inicializando useSystemStatus...');
+        
+        // Generar token si no existe
+        if (!authService.isAuthenticated()) {
+            console.log('🔐 Generando token inicial...');
+            authService.generateWebSocketToken();
+        }
+        
         checkSystemStatus();
     }, [checkSystemStatus]);
 
