@@ -15,6 +15,7 @@ function App() {
   } = useSystemStatus();
 
   const [showNotification, setShowNotification] = useState(false);
+  const [mostrarTerminos, setMostrarTerminos] = useState(false);
 
   // Manejar notificaciones
   useEffect(() => {
@@ -120,8 +121,8 @@ function App() {
         <Route path="/" element={<Navigate to="/garantizado" replace />} />
         <Route path="/garantizado" element={
           <div className="min-h-screen flex flex-col">
-            <Hero isActive={isActive} isConnected={isConnected} />
-            <Footer />
+            <Hero isActive={isActive} isConnected={isConnected} mostrarTerminos={mostrarTerminos} setMostrarTerminos={setMostrarTerminos} />
+            <Footer onMostrarTerminos={() => setMostrarTerminos(true)} />
           </div>
         } />
       </Routes>

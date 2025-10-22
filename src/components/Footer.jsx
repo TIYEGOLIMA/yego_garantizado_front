@@ -1,4 +1,4 @@
-export default function Footer() {
+export default function Footer({ onMostrarTerminos }) {
   return (
     <footer className="bg-dark text-white py-12 px-4">
       <div className="max-w-6xl mx-auto">
@@ -14,7 +14,14 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-3 text-primary">Enlaces</h4>
             <ul className="space-y-2 text-white">
-              <li><a href="#" className="hover:text-primary transition-colors">Términos y Condiciones</a></li>
+              <li>
+                <button 
+                  onClick={onMostrarTerminos}
+                  className="hover:text-primary transition-colors cursor-pointer text-left"
+                >
+                  Términos y Condiciones
+                </button>
+              </li>
             </ul>
           </div>
           

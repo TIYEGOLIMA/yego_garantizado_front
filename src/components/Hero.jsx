@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import ModalTerminos from './ModalTerminos'
 import { API_ENDPOINTS } from '../config/api'
-export default function Hero({ isActive, isConnected }) {
+export default function Hero({ isActive, isConnected, mostrarTerminos, setMostrarTerminos }) {
 
   const [formData, setFormData] = useState({
     licenciaNumero: '',
@@ -9,10 +9,15 @@ export default function Hero({ isActive, isConnected }) {
     terminosAceptados: false
   })
 
+  // Estado para controlar si se pueden aceptar términos
+  const [terminosDisponibles, setTerminosDisponibles] = useState(false)
+  
+  // Estado para controlar si el checkbox debe quedar permanentemente marcado
+  const [terminosAceptadosPermanentemente, setTerminosAceptadosPermanentemente] = useState(false)
+
   const [errores, setErrores] = useState({})
   const [enviando, setEnviando] = useState(false)
   const [exitoso, setExitoso] = useState(false)
-  const [mostrarTerminos, setMostrarTerminos] = useState(false)
   const [flotas, setFlotas] = useState([])
   const [cargandoFlotas, setCargandoFlotas] = useState(false)
   
@@ -168,6 +173,12 @@ export default function Hero({ isActive, isConnected }) {
 
   const manejarCambio = (e) => {
     const { name, value, type, checked } = e.target
+    
+    // Si es el checkbox de términos, no permitir cambios una vez aceptados permanentemente
+    if (name === 'terminosAceptados' && terminosAceptadosPermanentemente) {
+      return // No permitir ningún cambio una vez aceptados permanentemente
+    }
+    
     const nuevoValor = type === 'checkbox' ? checked : (name === 'licenciaNumero' ? value.toUpperCase() : value)
     setFormData(prev => ({
       ...prev,
@@ -463,12 +474,31 @@ export default function Hero({ isActive, isConnected }) {
                         name="terminosAceptados"
                         checked={formData.terminosAceptados}
                         onChange={manejarCambio}
-                        disabled={!sistemaActivo}
-                        className="w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer accent-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ accentColor: '#FF0000' }}
+                        disabled={!sistemaActivo || !terminosDisponibles || terminosAceptadosPermanentemente}
+                        className={`w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer ${
+                          terminosAceptadosPermanentemente 
+                            ? 'accent-red-500 opacity-100' 
+                            : 'accent-primary disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
+                        style={{ 
+                          accentColor: terminosAceptadosPermanentemente ? '#EF4444' : '#FF0000'
+                        }}
                       />
                     </div>
                     <span className="text-sm text-gray-700 leading-relaxed">
+                      {terminosAceptadosPermanentemente ? (
+                        <>
+                          He leído y acepto los{' '}
+                          <button 
+                            type="button"
+                            onClick={() => setMostrarTerminos(true)}
+                            className="text-primary font-bold hover:underline"
+                          >
+                            términos y condiciones
+                          </button>
+                        </>
+                      ) : terminosDisponibles ? (
+                        <>
                       Acepto los{' '}
                       <button 
                         type="button"
@@ -477,6 +507,19 @@ export default function Hero({ isActive, isConnected }) {
                       >
                         términos y condiciones
                       </button>
+                        </>
+                      ) : (
+                        <>
+                          Primero debes leer los{' '}
+                          <button 
+                            type="button"
+                            onClick={() => setMostrarTerminos(true)}
+                            className="text-primary font-bold hover:underline"
+                          >
+                            términos y condiciones
+                          </button>
+                        </>
+                      )}
                     </span>
                   </label>
                   {errores.terminosAceptados && (
@@ -796,20 +839,52 @@ export default function Hero({ isActive, isConnected }) {
                             name="terminosAceptados"
                             checked={formData.terminosAceptados}
                             onChange={manejarCambio}
-                            disabled={!sistemaActivo}
-                            className="w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer accent-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ accentColor: '#FF0000' }}
+                            disabled={!sistemaActivo || !terminosDisponibles || terminosAceptadosPermanentemente}
+                            className={`w-5 h-5 border-2 border-dark rounded focus:ring-2 focus:ring-primary/50 cursor-pointer ${
+                              terminosAceptadosPermanentemente 
+                                ? 'accent-red-500 opacity-100' 
+                                : 'accent-primary disabled:opacity-50 disabled:cursor-not-allowed'
+                            }`}
+                            style={{ 
+                              accentColor: terminosAceptadosPermanentemente ? '#EF4444' : '#FF0000'
+                            }}
                           />
                         </div>
                         <span className="text-sm text-gray-700 leading-relaxed">
-                          Acepto los{' '}
-                          <button 
-                            type="button"
-                            onClick={() => setMostrarTerminos(true)}
-                            className="text-primary font-bold hover:underline"
-                          >
-                            términos y condiciones
-                          </button>
+                          {terminosAceptadosPermanentemente ? (
+                            <>
+                              He leído y acepto los{' '}
+                              <button 
+                                type="button"
+                                onClick={() => setMostrarTerminos(true)}
+                                className="text-primary font-bold hover:underline"
+                              >
+                                términos y condiciones
+                              </button>
+                            </>
+                          ) : terminosDisponibles ? (
+                            <>
+                              Acepto los{' '}
+                              <button 
+                                type="button"
+                                onClick={() => setMostrarTerminos(true)}
+                                className="text-primary font-bold hover:underline"
+                              >
+                                términos y condiciones
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              Primero debes leer los{' '}
+                              <button 
+                                type="button"
+                                onClick={() => setMostrarTerminos(true)}
+                                className="text-primary font-bold hover:underline"
+                              >
+                                términos y condiciones
+                              </button>
+                            </>
+                          )}
                         </span>
                       </label>
                       {errores.terminosAceptados && (
@@ -847,6 +922,8 @@ export default function Hero({ isActive, isConnected }) {
         mostrar={mostrarTerminos} 
         onCerrar={() => setMostrarTerminos(false)}
         onAceptar={() => {
+          setTerminosDisponibles(true) // Activar la posibilidad de aceptar términos
+          setTerminosAceptadosPermanentemente(true) // Bloquear permanentemente el checkbox
           setFormData(prev => ({ ...prev, terminosAceptados: true }))
           setMostrarTerminos(false)
           if (errores.terminosAceptados) {
