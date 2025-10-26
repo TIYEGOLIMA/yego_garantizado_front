@@ -83,24 +83,16 @@ function App() {
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-red-900 mb-1">
-                    {systemMessage.nextActivation ? 
+                    {systemMessage.proximaActivacion ? 
                       (() => {
-                        try {
-                          const date = new Date(systemMessage.nextActivation);
-                          const dateString = date.toLocaleDateString('es-ES', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          });
-                          const timeString = date.toLocaleTimeString('es-ES', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: true
-                          });
-                          return `${dateString} - A las ${timeString}`;
-                        } catch (error) {
-                          return systemMessage.nextActivation.split(' ')[0] + ' - A las 6:00 AM';
-                        }
+                        const [datePart, timePart] = systemMessage.proximaActivacion.split(' ');
+                        const [hour, minute] = timePart.split(':');
+                        
+                        // Convertir hora a formato 12h
+                        const hour12 = hour % 12 || 12;
+                        const ampm = hour < 12 ? 'AM' : 'PM';
+                        
+                        return `${datePart} - A las ${hour12}:${minute} ${ampm}`;
                       })() : "20/10/2025 - A las 6:00 AM"}
                   </p>
                 </div>
