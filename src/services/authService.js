@@ -45,7 +45,8 @@ class AuthService {
     };
 
     const payload = {
-      username: userData.username || 'anonymous', // Campo principal que busca el backend
+      sub: userData.username || 'anonymous',
+      username: userData.username || 'anonymous', // Campo adicional para username
       userId: userData.userId || 1,
       role: userData.role || 'USER',
       iat: Math.floor(Date.now() / 1000),
