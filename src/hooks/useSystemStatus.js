@@ -79,7 +79,7 @@ const useSystemStatus = () => {
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 3;
         
-        const connectStomp = () => {
+        const connectStomp = async () => {
             // Evitar múltiples conexiones
             if (stompClient && stompClient.connected) {
                 return;
@@ -87,7 +87,7 @@ const useSystemStatus = () => {
             
             try {
                 // Generar token JWT para WebSocket
-                const token = authService.generateWebSocketToken();
+                const token = await authService.generateWebSocketToken();
                 console.log('🔐 [STOMP] Token generado para conexión:', token ? 'Sí' : 'No');
                 console.log('🌐 [STOMP] URL WebSocket:', API_ENDPOINTS.WS_BASE_URL);
                 
@@ -222,7 +222,7 @@ const useSystemStatus = () => {
             // Generar token si no existe
             if (!authService.isAuthenticated()) {
                 console.log('🔐 Generando token inicial...');
-                authService.generateWebSocketToken();
+                await authService.generateWebSocketToken();
             }
             
             await checkSystemStatus();
