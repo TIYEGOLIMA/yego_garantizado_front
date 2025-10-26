@@ -1,4 +1,6 @@
 // Servicio de autenticación simple sin dependencias de Node.js
+import { JWT_CONFIG } from '../config/environment.js';
+
 class AuthService {
   constructor() {
     this.token = null;
@@ -54,8 +56,11 @@ class AuthService {
     const encodedHeader = this.base64ToBase64URL(btoa(JSON.stringify(header)));
     const encodedPayload = this.base64ToBase64URL(btoa(JSON.stringify(payload)));
     
-    // Usar la clave secreta real del backend
-    const secretKey = 'YegoBackendSecretKey2024VerySecureAndLongEnoughForHS512AlgorithmWithAtLeast64Characters';
+    // Usar la clave secreta según el entorno
+    const secretKey = JWT_CONFIG.getSecret();
+    console.log('🔐 [JWT] Usando clave secreta para:', import.meta.env.VITE_APP_ENV || 'development');
+    console.log('🔐 [JWT] Clave secreta (primeros 10 chars):', secretKey.substring(0, 10) + '...');
+    
     const message = `${encodedHeader}.${encodedPayload}`;
     const signature = await this.hmacSha256(message, secretKey);
     
