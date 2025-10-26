@@ -46,7 +46,6 @@ class AuthService {
 
     const payload = {
       sub: userData.username || 'anonymous',
-      username: userData.username || 'anonymous', // Campo adicional para username
       userId: userData.userId || 1,
       role: userData.role || 'USER',
       iat: Math.floor(Date.now() / 1000),
@@ -61,18 +60,12 @@ class AuthService {
     const secretKey = JWT_CONFIG.getSecret();
     console.log('🔐 [JWT] Usando clave secreta para:', import.meta.env.VITE_APP_ENV || 'development');
     console.log('🔐 [JWT] Clave secreta (primeros 10 chars):', secretKey.substring(0, 10) + '...');
-    console.log('🔐 [JWT] Payload del token:', JSON.stringify(payload, null, 2));
     
     const message = `${encodedHeader}.${encodedPayload}`;
     const signature = await this.hmacSha256(message, secretKey);
     
     this.token = `${encodedHeader}.${encodedPayload}.${signature}`;
     this.user = userData;
-    
-    // Logs adicionales para debug
-    console.log('🔐 [JWT] Token generado:', this.token.substring(0, 50) + '...');
-    console.log('🔐 [JWT] Header decodificado:', JSON.stringify(header, null, 2));
-    console.log('🔐 [JWT] Payload decodificado:', JSON.stringify(payload, null, 2));
     
     // Guardar en localStorage para persistencia
     localStorage.setItem('yego_token', this.token);
@@ -150,13 +143,7 @@ class AuthService {
       role: 'SISEXTERNO'
     };
 
-    const token = await this.generateToken(userData);
-    
-    // Debug del token generado
-    console.log('🔍 [JWT DEBUG] Verificando token generado:');
-    this.debugToken(token);
-    
-    return token;
+    return await this.generateToken(userData);
   }
 }
 
