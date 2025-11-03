@@ -147,6 +147,10 @@ export default function ModalTerminos({ mostrar, onCerrar, onAceptar }) {
                 <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 <p className="text-gray-800">Vigente solo para conductores activos de Yango bajo Yego.</p>
               </div>
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <p className="text-gray-800">Una vez finalizada la semana, los conductores tendrán un plazo máximo de 10 días para realizar reclamo de premio o cualquier observación y/o reclamo.</p>
+              </div>
             </div>
           </div>
 
@@ -158,11 +162,11 @@ export default function ModalTerminos({ mostrar, onCerrar, onAceptar }) {
                 <div className="mt-3 grid grid-cols-2 text-sm">
                   <div className="font-semibold text-gray-600 text-center">Viajes</div>
                   <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
-                  <div className="text-center">50</div><div className="text-center">20</div>
-                  <div className="text-center">70</div><div className="text-center">30</div>
-                  <div className="text-center">90</div><div className="text-center">42</div>
-                  <div className="text-center">110</div><div className="text-center">50</div>
-                  <div className="text-center">140</div><div className="text-center">60</div>
+                  <div className="text-center">60</div><div className="text-center">20</div>
+                  <div className="text-center">80</div><div className="text-center">30</div>
+                  <div className="text-center">100</div><div className="text-center">42</div>
+                  <div className="text-center">120</div><div className="text-center">50</div>
+                  <div className="text-center">145</div><div className="text-center">60</div>
                 </div>
               </div>
               <div className="bg-white border rounded-xl p-4 shadow-sm">
@@ -170,41 +174,16 @@ export default function ModalTerminos({ mostrar, onCerrar, onAceptar }) {
                 <div className="mt-3 grid grid-cols-2 text-sm">
                   <div className="font-semibold text-gray-600 text-center">Viajes</div>
                   <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
-                  <div className="text-center">70</div><div className="text-center">30</div>
-                  <div className="text-center">90</div><div className="text-center">42</div>
-                  <div className="text-center">110</div><div className="text-center">50</div>
-                  <div className="text-center">140</div><div className="text-center">60</div>
-                  <div className="text-center">175</div><div className="text-center">75</div>
+                  <div className="text-center">80</div><div className="text-center">30</div>
+                  <div className="text-center">100</div><div className="text-center">42</div>
+                  <div className="text-center">120</div><div className="text-center">50</div>
+                  <div className="text-center">145</div><div className="text-center">60</div>
+                  <div className="text-center">180</div><div className="text-center">75</div>
                 </div>
               </div>
 
               <div className="bg-white border rounded-xl p-4 shadow-sm">
                 <p className="text-center font-bold text-dark">SIN BRANDEO · AREQUIPA</p>
-                <div className="mt-3 grid grid-cols-2 text-sm">
-                  <div className="font-semibold text-gray-600 text-center">Viajes</div>
-                  <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
-                  <div className="text-center">50</div><div className="text-center">20</div>
-                  <div className="text-center">75</div><div className="text-center">30</div>
-                  <div className="text-center">100</div><div className="text-center">40</div>
-                  <div className="text-center">125</div><div className="text-center">50</div>
-                  <div className="text-center">155</div><div className="text-center">60</div>
-                </div>
-              </div>
-              <div className="bg-white border rounded-xl p-4 shadow-sm">
-                <p className="text-center font-bold text-dark">CON BRANDEO · AREQUIPA</p>
-                <div className="mt-3 grid grid-cols-2 text-sm">
-                  <div className="font-semibold text-gray-600 text-center">Viajes</div>
-                  <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
-                  <div className="text-center">75</div><div className="text-center">30</div>
-                  <div className="text-center">100</div><div className="text-center">40</div>
-                  <div className="text-center">125</div><div className="text-center">50</div>
-                  <div className="text-center">155</div><div className="text-center">60</div>
-                  <div className="text-center">190</div><div className="text-center">71</div>
-                </div>
-              </div>
-
-              <div className="bg-white border rounded-xl p-4 shadow-sm">
-                <p className="text-center font-bold text-dark">SIN BRANDEO · TRUJILLO</p>
                 <div className="mt-3 grid grid-cols-2 text-sm">
                   <div className="font-semibold text-gray-600 text-center">Viajes</div>
                   <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
@@ -216,7 +195,7 @@ export default function ModalTerminos({ mostrar, onCerrar, onAceptar }) {
                 </div>
               </div>
               <div className="bg-white border rounded-xl p-4 shadow-sm">
-                <p className="text-center font-bold text-dark">CON BRANDEO · TRUJILLO</p>
+                <p className="text-center font-bold text-dark">CON BRANDEO · AREQUIPA</p>
                 <div className="mt-3 grid grid-cols-2 text-sm">
                   <div className="font-semibold text-gray-600 text-center">Viajes</div>
                   <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
@@ -225,6 +204,31 @@ export default function ModalTerminos({ mostrar, onCerrar, onAceptar }) {
                   <div className="text-center">125</div><div className="text-center">50</div>
                   <div className="text-center">155</div><div className="text-center">60</div>
                   <div className="text-center">205</div><div className="text-center">76</div>
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-xl p-4 shadow-sm">
+                <p className="text-center font-bold text-dark">SIN BRANDEO · TRUJILLO</p>
+                <div className="mt-3 grid grid-cols-2 text-sm">
+                  <div className="font-semibold text-gray-600 text-center">Viajes</div>
+                  <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
+                  <div className="text-center">50</div><div className="text-center">20</div>
+                  <div className="text-center">75</div><div className="text-center">30</div>
+                  <div className="text-center">105</div><div className="text-center">40</div>
+                  <div className="text-center">125</div><div className="text-center">50</div>
+                  <div className="text-center">155</div><div className="text-center">60</div>
+                </div>
+              </div>
+              <div className="bg-white border rounded-xl p-4 shadow-sm">
+                <p className="text-center font-bold text-dark">CON BRANDEO · TRUJILLO</p>
+                <div className="mt-3 grid grid-cols-2 text-sm">
+                  <div className="font-semibold text-gray-600 text-center">Viajes</div>
+                  <div className="font-semibold text-gray-600 text-center">Hrs. Mínimas Requeridas</div>
+                  <div className="text-center">75</div><div className="text-center">30</div>
+                  <div className="text-center">100</div><div className="text-center">40</div>
+                  <div className="text-center">125</div><div className="text-center">50</div>
+                  <div className="text-center">155</div><div className="text-center">60</div>
+                  <div className="text-center">190</div><div className="text-center">71</div>
                 </div>
               </div>
             </div>
